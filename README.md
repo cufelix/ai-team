@@ -8,7 +8,7 @@ Autonomní AI vývojový tým nad tvými projekty, postavený na [Claude Code](h
 - **„Zavolání“**: když tým potřebuje tebe (rozhodnutí, ruční test), vytvoří událost v Google Kalendáři a pošle notifikaci (desktop, volitelně ntfy).
 - **Šetření usage**: denní strop běhů, pauza podle aktuálního 5h bloku (`ccusage`), backoff při vyčerpaném limitu, quiet hours.
 
-Bezpečnost: agenti nesmí `git push`, `gh pr merge` ani deploy (deny-list v `src/claude.rs`). Push a PR dělá orchestrátor, merge a deploy jen po tvém výslovném slovním schválení, které server navíc kontroluje. Server poslouchá jen na `127.0.0.1`.
+Bezpečnost: API vyžaduje token vygenerovaný při každém startu (ochrana proti CSRF) a kontroluje hlavičku Host (ochrana proti DNS rebinding). Server poslouchá jen na `127.0.0.1`. Merge a deploy tým jen navrhne. Provedou se, až potvrdíš přesně zobrazený cíl (tlačítkem nebo „schvaluju“), jedno schválení platí pro jednu akci a jen pro PR, které tým otevřel. Dev agenti nemají funkční přihlášení k GitHubu ani git push (prázdný credential helper, žádný SSH agent) a git hooky orchestrátor nespouští. **Limit:** CLI nástroje pro deploy s vlastním uloženým přihlášením (firebase, vercel…) jsou pro agenta dostupné přes shell. Pro tvrdou izolaci spouštěj agenty pod jiným uživatelem nebo v kontejneru.
 
 ## Požadavky
 Rust (stable), [Claude Code](https://claude.com/claude-code) přihlášený k předplatnému, `gh` (přihlášený), `git`, ElevenLabs API klíč. Volitelně `ccusage` (sledování usage), `notify-send`.

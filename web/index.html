@@ -72,6 +72,8 @@
 <script>
 const COLORS = ['#7cc4a4','#e6b450','#8fb3e8','#e59ab0','#c3a6e8','#9fd3d1'];
 const $ = s => document.querySelector(s);
+const TOKEN = '__AI_TEAM_TOKEN__', H = { 'x-ai-team': TOKEN };
+const api = (u, o = {}) => fetch(u, { ...o, headers: { ...(o.headers || {}), ...H } });
 let roles = [], busy = false, stream, ctx, analyser;
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const safeUrl = u => /^https:\/\//.test(u) ? u : '#';
@@ -86,7 +88,7 @@ function say(who, text, cls='') {
   $('#log').append(d); $('#log').scrollTop = 1e9;
 }
 async function refresh() {
-  const s = await fetch('/api/state').then(r => r.json()).catch(() => null); if (!s) return;
+  const s = await api('/api/state').then(r => r.json()).catch(() => null); if (!s) return;
   if (!roles.length) { roles = s.roles; renderTiles(); }
   const b = s.budget;
   $('#usage').textContent = `běhy dnes ${s.runs_today}/${b.max_runs}` + (b.block_cost != null ? ` · 5h blok $${b.block_cost.toFixed(1)} / pauza $${b.pause_at}` : '');
@@ -114,15 +116,22 @@ async function playReplies(replies) {
 async function send(form) {
   busy = true; $('#mic').disabled = true; $('#mic').textContent = '… tým přemýšlí';
   try {
-    const r = await fetch('/api/talk', { method:'POST', body:form }).then(r => r.json());
+    const r = await api('/api/talk', { method:'POST', body:form }).then(r => r.json());
     if (r.error) say('', 'Chyba: ' + r.error, 'sys');
     else {
       if (r.transcript && form.has('audio')) say('Felix', r.transcript, 'felix');
       (r.actions || []).forEach(a => say('', '⚙ ' + a, 'sys'));
       await playReplies(r.replies || []);
+      if (r.pending) showPending(r.pending);
     }
   } catch (e) { say('', 'Spojení selhalo: ' + e, 'sys'); }
   busy = false; $('#mic').disabled = false; $('#mic').textContent = '🎙 Podrž a mluv'; refresh();
+}
+function showPending(p) {
+  const d = document.createElement('div'); d.className = 'msg sys';
+  const b = document.createElement('button'); b.textContent = '✔ Potvrdit: ' + p.label;
+  b.onclick = async () => { b.disabled = true; const r = await api('/api/confirm', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ nonce: p.nonce }) }).then(r => r.json()); say('', r.result || r.error, 'sys'); refresh(); };
+  d.append(b); $('#log').append(d); $('#log').scrollTop = 1e9;
 }
 async function ensureMic() {
   if (stream) return;
@@ -148,7 +157,7 @@ $('#mic').addEventListener('pointerup', stopRec); $('#mic').addEventListener('po
 addEventListener('keydown', async e => { if (e.code === 'Space' && !e.repeat && document.activeElement !== $('#text')) { e.preventDefault(); await ensureMic(); startRec(); } });
 addEventListener('keyup', e => { if (e.code === 'Space' && document.activeElement !== $('#text')) stopRec(); });
 $('#text').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.value.trim() && !busy) { const f = new FormData(); f.append('text', e.target.value); say('Felix', e.target.value, 'felix'); e.target.value = ''; send(f); } });
-$('#work').onclick = () => fetch('/api/tick', { method:'POST' }).then(() => { say('', 'Spouštím kolo práce…', 'sys'); setTimeout(refresh, 1500); });
+$('#work').onclick = () => api('/api/tick', { method:'POST' }).then(() => { say('', 'Spouštím kolo práce…', 'sys'); setTimeout(refresh, 1500); });
 
 // Hands-free: simple voice activity detection, sends after ~1.3 s of silence.
 let hands = false, silentSince = 0;

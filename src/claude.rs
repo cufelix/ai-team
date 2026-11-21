@@ -56,6 +56,16 @@ pub async fn run(r: Run<'_>) -> anyhow::Result<Output> {
     }
     if r.dev_mode {
         cmd.args(["--permission-mode", "acceptEdits", "--allowedTools"]).args(DEV_ALLOWED);
+        // The deny-list is advisory (shell can route around prefixes). Hard stop: the agent process has
+        // no working GitHub/git push credentials. ponytail: deploy CLIs with their own stored logins
+        // (firebase, vercel…) are still reachable — run agents as a separate user/container if that matters.
+        cmd.env("GH_TOKEN", "disabled-for-agents")
+            .env("GIT_TERMINAL_PROMPT", "0")
+            .env("GIT_CONFIG_COUNT", "1")
+            .env("GIT_CONFIG_KEY_0", "credential.helper")
+            .env("GIT_CONFIG_VALUE_0", "")
+            .env("GIT_SSH_COMMAND", "false")
+            .env_remove("SSH_AUTH_SOCK");
         cmd.arg("--disallowedTools").args(DEV_DENIED);
     } else {
         cmd.arg("--allowedTools").args(READ_ONLY);

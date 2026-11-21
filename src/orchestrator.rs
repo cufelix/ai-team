@@ -183,7 +183,8 @@ Max 4 nové úkoly, každý zvládne jeden agent do 40 minut, nejdůležitějš�
 }
 
 async fn git(dir: &Path, args: &[&str]) -> anyhow::Result<String> {
-    let out = tokio::process::Command::new("git").current_dir(dir).args(args).output().await?;
+    // Hooks off: agents can write .git/hooks, the orchestrator must not run them with push credentials.
+    let out = tokio::process::Command::new("git").current_dir(dir).args(["-c", "core.hooksPath=/dev/null"]).args(args).output().await?;
     anyhow::ensure!(out.status.success(), "git {}: {}", args.join(" "), String::from_utf8_lossy(&out.stderr).trim());
     Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
