@@ -184,7 +184,14 @@ Max 4 nové úkoly, každý zvládne jeden agent do 40 minut, nejdůležitějš�
 
 async fn git(dir: &Path, args: &[&str]) -> anyhow::Result<String> {
     // Hooks off: agents can write .git/hooks, the orchestrator must not run them with push credentials.
-    let out = tokio::process::Command::new("git").current_dir(dir).args(["-c", "core.hooksPath=/dev/null"]).args(args).output().await?;
+    // Repo config is agent-writable (shared .git): neutralise keys that can execute code, and use a fixed
+    // credential helper so a planted helper can't run with our push rights.
+    const SAFE: &[&str] = &[
+        "-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false", "-c", "core.sshCommand=ssh",
+        "-c", "protocol.ext.allow=never", "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false",
+        "-c", "credential.helper=", "-c", "credential.helper=!gh auth git-credential",
+    ];
+    let out = tokio::process::Command::new("git").current_dir(dir).env("GIT_CONFIG_NOSYSTEM", "1").args(SAFE).args(args).output().await?;
     anyhow::ensure!(out.status.success(), "git {}: {}", args.join(" "), String::from_utf8_lossy(&out.stderr).trim());
     Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }

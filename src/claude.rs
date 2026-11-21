@@ -56,10 +56,13 @@ pub async fn run(r: Run<'_>) -> anyhow::Result<Output> {
     }
     if r.dev_mode {
         cmd.args(["--permission-mode", "acceptEdits", "--allowedTools"]).args(DEV_ALLOWED);
-        // The deny-list is advisory (shell can route around prefixes). Hard stop: the agent process has
-        // no working GitHub/git push credentials. ponytail: deploy CLIs with their own stored logins
-        // (firebase, vercel…) are still reachable — run agents as a separate user/container if that matters.
+        // Defense in depth only: the deny-list is advisory and an agent with a shell runs as Felix, so it can
+        // reach any file he can. These env vars just keep gh/git push credentials out of the default path.
+        // ponytail: real isolation = separate OS user or container (bwrap) for agents; add before untrusted repos.
+        let empty = crate::config::state_dir().join("agent-empty-config");
+        let _ = std::fs::create_dir_all(&empty);
         cmd.env("GH_TOKEN", "disabled-for-agents")
+            .env("GH_CONFIG_DIR", &empty)
             .env("GIT_TERMINAL_PROMPT", "0")
             .env("GIT_CONFIG_COUNT", "1")
             .env("GIT_CONFIG_KEY_0", "credential.helper")

@@ -131,6 +131,7 @@ async fn talk_inner(app: &Arc<App>, mp: &mut Multipart) -> anyhow::Result<Value>
     if text.is_empty() {
         return Ok(json!({"transcript": "", "replies": []}));
     }
+    let staged = take_pending(None);
     let today = Local::now().date_naive();
     let (snapshot, resume) = app.board.with(|b| {
         b.log("Felix", text.clone());
@@ -152,10 +153,12 @@ async fn talk_inner(app: &Arc<App>, mp: &mut Multipart) -> anyhow::Result<Value>
     let v = claude::last_json(&out.text).unwrap_or_else(|| json!({"replies":[{"role":"sef","text": out.text}]}));
 
     let mut done = Vec::new();
-    // Spoken approval confirms only the action already shown on screen (bound target), never a new one.
-    if approves(&text) {
-        if let Some(p) = take_pending(None) {
+    // A staged action lives for exactly one turn: the next utterance either approves it or discards it.
+    if let Some(p) = staged {
+        if approves(&text) {
             done.push(execute(app, p).await);
+        } else {
+            done.push(format!("zrušeno (neschváleno): {}", p.label));
         }
     }
     for a in v["actions"].as_array().into_iter().flatten() {
