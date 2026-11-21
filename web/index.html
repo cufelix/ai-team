@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI tým · meeting</title>
+<style>
+  :root { --bg:#0f1113; --panel:#181b1f; --line:#262a30; --text:#e8e6e3; --mute:#8b9098; --acc:#7cc4a4; --warn:#e6b450; --bad:#e5736b; }
+  * { box-sizing:border-box; margin:0 }
+  body { background:var(--bg); color:var(--text); font:15px/1.45 ui-sans-serif, system-ui, sans-serif; height:100dvh; display:grid; grid-template-columns:1fr 380px; grid-template-rows:1fr auto; }
+  main { padding:20px; overflow:auto; display:flex; flex-direction:column; gap:16px; min-width:0 }
+  header { display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap }
+  h1 { font-size:18px; font-weight:600; letter-spacing:.01em }
+  .meta { color:var(--mute); font-size:13px; display:flex; gap:14px; flex-wrap:wrap }
+  .tiles { display:grid; grid-template-columns:repeat(auto-fill, minmax(170px,1fr)); gap:12px }
+  .tile { background:var(--panel); border:1px solid var(--line); border-radius:14px; aspect-ratio:4/3; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; position:relative; transition:border-color .2s, box-shadow .2s }
+  .tile.speaking { border-color:var(--acc); box-shadow:0 0 0 3px color-mix(in srgb, var(--acc) 25%, transparent) }
+  .avatar { width:64px; height:64px; border-radius:50%; display:grid; place-items:center; font-weight:650; font-size:22px; color:#0f1113 }
+  .tile .name { font-weight:600 } .tile .title { color:var(--mute); font-size:12.5px; text-align:center; padding:0 8px }
+  .tile.me .avatar { background:var(--text) } .tile.me .title { display:none }
+  .level { position:absolute; bottom:10px; left:14px; right:14px; height:3px; background:var(--line); border-radius:2px; overflow:hidden }
+  .level i { display:block; height:100%; width:0; background:var(--acc); transition:width .08s }
+  .transcript { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px 16px; flex:1; min-height:180px; overflow:auto; display:flex; flex-direction:column; gap:10px }
+  .msg b { font-weight:600 } .msg.felix b { color:var(--acc) } .msg.sys { color:var(--mute); font-size:13px }
+  footer { grid-column:1; padding:14px 20px; border-top:1px solid var(--line); display:flex; gap:10px; align-items:center; background:var(--bg) }
+  button { font:inherit; color:var(--text); background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:10px 16px; cursor:pointer; white-space:nowrap }
+  button:hover { border-color:var(--mute) } button:focus-visible, input:focus-visible { outline:2px solid var(--acc); outline-offset:2px }
+  #mic { background:var(--acc); color:#0f1113; border:none; font-weight:600; min-width:150px }
+  #mic.rec { background:var(--bad); color:#fff } #mic:disabled { opacity:.55; cursor:wait }
+  #hands.on { border-color:var(--acc); color:var(--acc) }
+  #text { flex:1; min-width:0; font:inherit; color:var(--text); background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:10px 16px }
+  aside { grid-row:1 / span 2; grid-column:2; border-left:1px solid var(--line); background:var(--panel); overflow:auto; padding:18px; display:flex; flex-direction:column; gap:18px }
+  aside h2 { font-size:13px; text-transform:uppercase; letter-spacing:.08em; color:var(--mute); font-weight:600 }
+  .proj { display:flex; flex-direction:column; gap:6px }
+  .proj h3 { font-size:15px; display:flex; justify-content:space-between; gap:8px } .proj h3 span { color:var(--mute); font-weight:400; font-size:12.5px }
+  .proj p { color:var(--mute); font-size:13px }
+  .task { font-size:13.5px; display:grid; grid-template-columns:auto 1fr; gap:8px; align-items:baseline }
+  .task a { color:var(--acc) }
+  .pill { font-size:11px; padding:1px 7px; border-radius:999px; border:1px solid var(--line); color:var(--mute) }
+  .pill.in_progress { color:var(--acc); border-color:var(--acc) } .pill.review { color:var(--warn); border-color:var(--warn) } .pill.needs_human { color:var(--bad); border-color:var(--bad) }
+  .log { font-size:12.5px; color:var(--mute); display:flex; flex-direction:column; gap:4px } .log b { color:var(--text); font-weight:500 }
+  @media (max-width: 900px) {
+    body { grid-template-columns:1fr; grid-template-rows:auto auto auto }
+    main { overflow:visible } aside { grid-row:auto; grid-column:1; border-left:none; border-top:1px solid var(--line) }
+    footer { grid-row:2; position:sticky; bottom:0; flex-wrap:wrap } #text { flex-basis:100% ; order:3 }
+    .tiles { grid-template-columns:repeat(3, 1fr) } .tile { aspect-ratio:1 } .avatar { width:44px; height:44px; font-size:17px } .tile .title { display:none }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition:none !important } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Meeting · AI tým</h1>
+    <div class="meta"><span id="clock"></span><span id="usage"></span><span id="cal"></span></div>
+  </header>
+  <section class="tiles" id="tiles" aria-label="Účastníci"></section>
+  <section class="transcript" id="log" aria-live="polite"></section>
+</main>
+<footer>
+  <button id="mic" aria-label="Podrž a mluv (mezerník)">🎙 Podrž a mluv</button>
+  <button id="hands" aria-pressed="false" title="Mluv volně, odešle se po pauze">Hands-free</button>
+  <input id="text" placeholder="…nebo napiš a Enter" aria-label="Zpráva týmu">
+  <button id="work" title="Spustit kolo práce teď">▶ Práce</button>
+</footer>
+<aside>
+  <h2>Projekty</h2>
+  <div id="board" style="display:flex;flex-direction:column;gap:18px"></div>
+  <h2>Co se děje</h2>
+  <div class="log" id="activity"></div>
+</aside>
+<script>
+const COLORS = ['#7cc4a4','#e6b450','#8fb3e8','#e59ab0','#c3a6e8','#9fd3d1'];
+const $ = s => document.querySelector(s);
+let roles = [], busy = false, stream, ctx, analyser;
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const safeUrl = u => /^https:\/\//.test(u) ? u : '#';
+
+function renderTiles() {
+  $('#tiles').innerHTML = `<div class="tile me" id="t-me"><div class="avatar">F</div><div class="name">Felix</div><div class="title">ty</div><div class="level"><i id="lvl"></i></div></div>` +
+    roles.map((r,i) => `<div class="tile" id="t-${esc(r.id)}"><div class="avatar" style="background:${COLORS[i%COLORS.length]}">${esc(r.name[0])}</div><div class="name">${esc(r.name)}</div><div class="title">${esc(r.title)}</div></div>`).join('');
+}
+function say(who, text, cls='') {
+  const d = document.createElement('div'); d.className = 'msg ' + cls;
+  d.innerHTML = who ? `<b>${esc(who)}:</b> ${esc(text)}` : esc(text);
+  $('#log').append(d); $('#log').scrollTop = 1e9;
+}
+async function refresh() {
+  const s = await fetch('/api/state').then(r => r.json()).catch(() => null); if (!s) return;
+  if (!roles.length) { roles = s.roles; renderTiles(); }
+  const b = s.budget;
+  $('#usage').textContent = `běhy dnes ${s.runs_today}/${b.max_runs}` + (b.block_cost != null ? ` · 5h blok $${b.block_cost.toFixed(1)} / pauza $${b.pause_at}` : '');
+  $('#cal').textContent = s.calendar ? 'kalendář ✓' : 'kalendář nepřipojen';
+  const order = {needs_human:0, review:1, in_progress:2, todo:3, done:4};
+  $('#board').innerHTML = s.projects.map(p => {
+    const ps = s.board.projects[p.id] || {};
+    const tasks = s.board.tasks.filter(t => t.project === p.id && t.status !== 'dropped' && !(t.status === 'done' && Date.now() - Date.parse(t.updated) > 3*864e5))
+      .sort((a,b) => order[a.status]-order[b.status] || a.priority-b.priority);
+    return `<div class="proj"><h3>${esc(p.name)}<span>${ps.deadline ? 'do ' + esc(ps.deadline) : ''}${ps.paused ? ' · pauza' : ''}${p.autonomous ? '' : ' · jen plán'}</span></h3>
+      ${ps.summary ? `<p>${esc(ps.summary)}</p>` : '<p>Čeká na první plánování.</p>'}
+      ${tasks.map(t => `<div class="task"><span class="pill ${t.status}">${t.status.replace('_',' ')}</span><span>#${t.id} ${esc(t.title)}${t.pr_url ? ` · <a href="${esc(safeUrl(t.pr_url))}" target="_blank" rel="noopener">PR</a>` : ''}${t.human_ask ? `<br><span style="color:var(--bad)">${esc(t.human_ask)}</span>` : ''}</span></div>`).join('')}</div>`;
+  }).join('');
+  $('#activity').innerHTML = s.board.log.slice(-25).reverse().map(e => `<div><b>${esc(e.who)}</b> ${esc(e.text)}</div>`).join('');
+}
+async function playReplies(replies) {
+  for (const r of replies) {
+    say(r.name, r.text);
+    const tile = document.getElementById('t-' + r.role); tile?.classList.add('speaking');
+    if (r.audio) await new Promise(res => { const a = new Audio('data:audio/mpeg;base64,' + r.audio); a.onended = a.onerror = res; a.play().catch(res); });
+    else await new Promise(res => setTimeout(res, 1200));
+    tile?.classList.remove('speaking');
+  }
+}
+async function send(form) {
+  busy = true; $('#mic').disabled = true; $('#mic').textContent = '… tým přemýšlí';
+  try {
+    const r = await fetch('/api/talk', { method:'POST', body:form }).then(r => r.json());
+    if (r.error) say('', 'Chyba: ' + r.error, 'sys');
+    else {
+      if (r.transcript && form.has('audio')) say('Felix', r.transcript, 'felix');
+      (r.actions || []).forEach(a => say('', '⚙ ' + a, 'sys'));
+      await playReplies(r.replies || []);
+    }
+  } catch (e) { say('', 'Spojení selhalo: ' + e, 'sys'); }
+  busy = false; $('#mic').disabled = false; $('#mic').textContent = '🎙 Podrž a mluv'; refresh();
+}
+async function ensureMic() {
+  if (stream) return;
+  stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation:true, noiseSuppression:true } });
+  ctx = new AudioContext(); analyser = ctx.createAnalyser(); analyser.fftSize = 512;
+  ctx.createMediaStreamSource(stream).connect(analyser);
+  const buf = new Uint8Array(analyser.fftSize);
+  (function meter() { analyser.getByteTimeDomainData(buf); let m = 0; for (const v of buf) m = Math.max(m, Math.abs(v-128)); level = m / 128; $('#lvl').style.width = Math.min(100, level*250) + '%'; requestAnimationFrame(meter); })();
+}
+let level = 0, rec = null, chunks = [];
+function startRec() {
+  if (busy || rec) return;
+  chunks = []; rec = new MediaRecorder(stream);
+  rec.ondataavailable = e => chunks.push(e.data);
+  rec.onstop = () => { const blob = new Blob(chunks, { type: rec.mimeType }); rec = null; $('#mic').classList.remove('rec'); $('#t-me').classList.remove('speaking');
+    if (blob.size > 2000) { const f = new FormData(); f.append('audio', blob, 'a.webm'); send(f); } };
+  rec.start(); $('#mic').classList.add('rec'); $('#mic').textContent = '● Nahrávám…'; $('#t-me').classList.add('speaking');
+}
+const stopRec = () => rec && rec.state === 'recording' && rec.stop();
+
+$('#mic').addEventListener('pointerdown', async e => { e.preventDefault(); await ensureMic(); startRec(); });
+$('#mic').addEventListener('pointerup', stopRec); $('#mic').addEventListener('pointerleave', stopRec);
+addEventListener('keydown', async e => { if (e.code === 'Space' && !e.repeat && document.activeElement !== $('#text')) { e.preventDefault(); await ensureMic(); startRec(); } });
+addEventListener('keyup', e => { if (e.code === 'Space' && document.activeElement !== $('#text')) stopRec(); });
+$('#text').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.value.trim() && !busy) { const f = new FormData(); f.append('text', e.target.value); say('Felix', e.target.value, 'felix'); e.target.value = ''; send(f); } });
+$('#work').onclick = () => fetch('/api/tick', { method:'POST' }).then(() => { say('', 'Spouštím kolo práce…', 'sys'); setTimeout(refresh, 1500); });
+
+// Hands-free: simple voice activity detection, sends after ~1.3 s of silence.
+let hands = false, silentSince = 0;
+$('#hands').onclick = async () => { await ensureMic(); hands = !hands; $('#hands').classList.toggle('on', hands); $('#hands').setAttribute('aria-pressed', hands); };
+setInterval(() => {
+  if (!hands || busy) return;
+  if (level > 0.08) { silentSince = 0; startRec(); }
+  else if (rec) { silentSince ||= Date.now(); if (Date.now() - silentSince > 1300) { silentSince = 0; stopRec(); } }
+}, 100);
+
+setInterval(() => $('#clock').textContent = new Date().toLocaleString('cs-CZ', { weekday:'short', hour:'2-digit', minute:'2-digit' }), 1000);
+refresh(); setInterval(refresh, 8000);
+say('', 'Podrž mikrofon (nebo mezerník) a mluv na tým. Např. „Jak jsme na tom s Fantastickými obědy?“', 'sys');
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+# Kopíruj do ~/.config/systemd/user/ai-team.service (cesty uprav podle sebe; %h = home)
+[Unit]
+Description=AI tým (orchestrátor + meeting room)
+After=network-online.target
+
+[Service]
+WorkingDirectory=%h/projects/ai-team
+Environment=PATH=%h/.local/bin:%h/.cargo/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=%h/projects/ai-team/target/release/ai-team serve --idle
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

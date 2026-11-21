@@ -1,0 +1,84 @@
+# AI tým: role, projekty, rozvrh a úsporný režim.
+# Úpravy se projeví po restartu `ai-team serve`.
+
+[server]
+port = 7777
+# Odkaz, který jde do kalendáře/notifikací (změň na Tailscale/LAN adresu, pokud chceš z mobilu).
+public_url = "http://localhost:7777"
+
+[budget]
+# Tým běží na Max 5x: efektivně, ale s rezervou pro tvou ruční práci.
+max_concurrent = 2          # kolik dev agentů běží najednou
+max_dev_runs_per_day = 12   # strop autonomních dev běhů za den
+plan_every_hours = 12       # jak často manažer přeplánuje projekt
+tick_minutes = 20           # jak často se orchestrátor probudí
+pause_if_block_cost_usd = 40.0  # aktivní 5h blok dražší než tohle (ccusage) → pauza
+quiet_hours = []            # např. [9,10,11] = v tyhle hodiny agenti nemakají (ty pracuješ ručně)
+dev_model = "sonnet"
+plan_model = "sonnet"
+meeting_model = "sonnet"
+dev_timeout_minutes = 45
+
+[standup]
+days = ["Mon", "Wed", "Fri"]   # povinné meetingy
+time = "09:30"
+minutes = 20
+timezone_offset = "+01:00"
+
+[notify]
+desktop = true
+ntfy_topic = ""   # volitelné: náhodný název topicu na ntfy.sh → push na mobil (appka ntfy)
+
+# voice = ElevenLabs voice_id (GET /v2/voices). Pro češtinu vyber české hlasy z Voice Library.
+[[roles]]
+id = "sef"
+name = "Marek"
+title = "Šéf / produktový manažer"
+voice = "pNInz6obpgDQGcFmaJgB"
+persona = "Vede tým, hlídá deadliny a priority, mluví stručně a rozhodně, shrnuje a navrhuje další kroky."
+
+[[roles]]
+id = "techlead"
+name = "Tomáš"
+title = "Tech lead"
+voice = "TxGEqnHWrfWFTfGW9XjX"
+persona = "Zodpovídá za architekturu, kvalitu kódu, review PR a technická rizika. Věcný, konkrétní."
+
+[[roles]]
+id = "dev"
+name = "Kuba"
+title = "Senior developer"
+voice = "ErXwobaYiN019PkySvjV"
+persona = "Implementuje úkoly, ví přesně, co se v kterém PR změnilo a co je rozdělané. Energický."
+
+[[roles]]
+id = "designer"
+name = "Jana"
+title = "UI/UX designérka"
+voice = "EXAVITQu4vr4xnSDxMaL"
+persona = "Hlídá UX, vizuál, přístupnost a responzivitu. Navrhuje konkrétní úpravy obrazovek."
+
+[[roles]]
+id = "qa"
+name = "Anna"
+title = "QA / tester"
+voice = "21m00Tcm4TlvDq8ikWAM"
+persona = "Testuje, hlídá regrese, říká, co máš ručně vyzkoušet a jak."
+
+[[projects]]
+id = "my-web-app"
+name = "Moje webová appka"
+path = "/home/YOU/projects/my-web-app"   # git repo s GitHub remote (kvůli PR)
+autonomous = true    # false = agenti jen plánují a reportují
+deadline = ""        # YYYY-MM-DD, šéf ho jinak odvodí z docs; jde nastavit i hlasem na meetingu
+deploy_cmd = ""      # spustí se JEN po tvém slovním schválení na meetingu
+notes = "Stack, kde jsou docs, jak spustit testy — čím víc kontextu, tím chytřejší plán."
+
+[[projects]]
+id = "client-project"
+name = "Klientský projekt"
+path = "/home/YOU/projects/client-project"
+autonomous = false
+deadline = ""
+deploy_cmd = ""
+notes = "Podklady v docs/."
